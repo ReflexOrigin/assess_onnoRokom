@@ -87,5 +87,51 @@ public class ExpirationTests : IClassFixture<TestWebApplicationFactory>
         Assert.NotNull(holdBData);
         Assert.Equal(studentB, holdBData.StudentId);
     }
+
+    [Fact]
+    public async Task ExpiredHold_AllowsSameStudentToReapplyForSameClass()
+    {
+        // 1. Create a class with 1 seat
+        var classResponse = await _client.PostAsJsonAsync("/classes", new CreateClassRequest
+        {
+            Name = "Class 5 - Reapply Test",
+            TotalSeats = 1
+        });
+        var createdClass = await classResponse.Content.ReadFromJsonAsync<CreateClassResponse>();
+        Assert.NotNull(createdClass);
+
+        var studentId = "20152691234567899";
+
+        // 2. Student reserves the seat initially
+        using var firstHoldReq = new HttpRequestMessage(HttpMethod.Post, $"/classes/{createdClass.Id}/holds");
+        firstHoldReq.Headers.Add("X-Student-Id", studentId);
+        var firstResponse = await _client.SendAsync(firstHoldReq);
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        var firstHoldData = await firstResponse.Content.ReadFromJsonAsync<CreateHoldResponse>();
+        Assert.NotNull(firstHoldData);
+
+        // 3. Simulate hold expiration by setting ExpiresAt in the past
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SchoolAdmissionDbContext>();
+            var record = await db.AdmissionHolds.FindAsync(firstHoldData.HoldId);
+            Assert.NotNull(record);
+            record.ExpiresAt = DateTime.UtcNow.AddMinutes(-5);
+            await db.SaveChangesAsync();
+        }
+
+        // 4. Same student should now be able to re-apply and reserve the seat again!
+        using var reapplyReq = new HttpRequestMessage(HttpMethod.Post, $"/classes/{createdClass.Id}/holds");
+        reapplyReq.Headers.Add("X-Student-Id", studentId);
+        var reapplyResponse = await _client.SendAsync(reapplyReq);
+        Assert.Equal(HttpStatusCode.Created, reapplyResponse.StatusCode);
+
+        var reapplyHoldData = await reapplyResponse.Content.ReadFromJsonAsync<CreateHoldResponse>();
+        Assert.NotNull(reapplyHoldData);
+        Assert.NotEqual(firstHoldData.HoldId, reapplyHoldData.HoldId);
+        Assert.Equal(createdClass.Id, reapplyHoldData.ClassId);
+        Assert.Equal(studentId, reapplyHoldData.StudentId);
+        Assert.Equal(HoldStatus.Held, reapplyHoldData.Status);
+    }
 }
 

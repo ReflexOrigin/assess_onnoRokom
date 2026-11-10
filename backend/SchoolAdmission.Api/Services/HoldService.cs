@@ -89,6 +89,22 @@ public class HoldService : IHoldService
 
                     var now = DateTime.UtcNow;
 
+                    // Eagerly transition any expired holds for this class to EXPIRED status so their slots and database index rows are cleared
+                    var expiredHoldsForClass = await _context.AdmissionHolds
+                        .Where(h => h.ClassId == classId &&
+                                    h.Status == HoldStatus.Held &&
+                                    h.ExpiresAt <= now)
+                        .ToListAsync(ct);
+
+                    if (expiredHoldsForClass.Count > 0)
+                    {
+                        foreach (var expiredHold in expiredHoldsForClass)
+                        {
+                            expiredHold.Status = HoldStatus.Expired;
+                        }
+                        await _context.SaveChangesAsync(ct);
+                    }
+
                     // Check duplicate active or confirmed application by this student for this class
                     var hasActiveOrConfirmed = await _context.AdmissionHolds
                         .AnyAsync(h => h.ClassId == classId &&

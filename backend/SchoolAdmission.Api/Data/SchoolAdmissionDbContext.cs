@@ -63,10 +63,16 @@ public class SchoolAdmissionDbContext : DbContext
                   .HasDatabaseName("IX_AdmissionHolds_ExpiresAt_Status");
 
             // Unique partial index: at most one active (HELD) or CONFIRMED hold per student per class
-            entity.HasIndex(h => new { h.ClassId, h.StudentId })
-                  .HasDatabaseName("IX_AdmissionHolds_ClassId_StudentId_ActiveUnique")
-                  .HasFilter("\"Status\" IN ('HELD', 'CONFIRMED')")
-                  .IsUnique();
+            // Note: HasFilter is supported only in relational databases (PostgreSQL).
+            // The EF Core In-Memory provider does not support partial filters and would erroneously enforce
+            // unconditional uniqueness across all statuses, preventing a student from reapplying after hold expiration.
+            if (Database.IsRelational())
+            {
+                entity.HasIndex(h => new { h.ClassId, h.StudentId })
+                      .HasDatabaseName("IX_AdmissionHolds_ClassId_StudentId_ActiveUnique")
+                      .HasFilter("\"Status\" IN ('HELD', 'CONFIRMED')")
+                      .IsUnique();
+            }
         });
     }
 }
