@@ -142,6 +142,9 @@ app.UseSwaggerUI(c =>
 
 app.UseCors("AllowFrontend");
 
+// Root redirect to Swagger UI
+app.MapGet("/", () => Results.Redirect("/swagger"));
+
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }));
 

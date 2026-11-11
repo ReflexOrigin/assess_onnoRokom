@@ -267,6 +267,15 @@ body {
   background-color: #047857;
 }
 
+.btn-warning {
+  background-color: var(--warning);
+  color: #ffffff;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: #b45309;
+}
+
 .btn-danger {
   background-color: var(--danger);
   color: #ffffff;
@@ -350,6 +359,16 @@ body {
 .class-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow);
+}
+
+.class-card.enrolled {
+  border: 2px solid var(--success);
+  background: linear-gradient(to bottom, #f0fdf4 0%, #ffffff 45%);
+}
+
+.class-card.held {
+  border: 2px solid var(--warning);
+  background: linear-gradient(to bottom, #fffbeb 0%, #ffffff 45%);
 }
 
 .class-title {

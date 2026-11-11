@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw, AlertCircle, CheckCircle2, UserCheck, ArrowRight } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, UserCheck, ArrowRight, Clock } from 'lucide-react';
 import { api, ApiException } from '../api/client';
-import { ClassItem, HoldItem } from '../types';
+import { ClassItem, HoldItem, StudentHoldSummary } from '../types';
 
 interface Props {
   studentId: string;
@@ -15,9 +15,11 @@ export const ClassListScreen: React.FC<Props> = ({
   studentId,
   isStudentIdValid,
   onHoldCreated,
+  onSelectHold,
   onNavigateToAdmin,
 }) => {
   const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [myHolds, setMyHolds] = useState<StudentHoldSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -29,9 +31,15 @@ export const ClassListScreen: React.FC<Props> = ({
   const fetchClasses = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) setIsRefreshing(true);
     try {
-      const data = await api.getClasses();
+      const [classesData, holdsData] = await Promise.all([
+        api.getClasses(),
+        isStudentIdValid
+          ? api.getMyHolds(studentId).catch(() => [] as StudentHoldSummary[])
+          : Promise.resolve([] as StudentHoldSummary[]),
+      ]);
       if (isMounted.current) {
-        setClasses(data);
+        setClasses(classesData);
+        setMyHolds(holdsData);
         setErrorMessage(null);
       }
     } catch (err: unknown) {
@@ -48,9 +56,9 @@ export const ClassListScreen: React.FC<Props> = ({
         if (showRefreshIndicator) setIsRefreshing(false);
       }
     }
-  }, []);
+  }, [studentId, isStudentIdValid]);
 
-  // Initial load and periodic polling every 4 seconds to keep seat availability fresh without reload
+  // Initial load and periodic polling every 4 seconds to keep seat availability and enrollments fresh
   useEffect(() => {
     isMounted.current = true;
     fetchClasses();
@@ -178,12 +186,32 @@ export const ClassListScreen: React.FC<Props> = ({
             const confirmedPercent = (cls.confirmedSeats / cls.totalSeats) * 100;
             const heldPercent = (cls.heldSeats / cls.totalSeats) * 100;
 
+            // Check if currently selected student is enrolled or has an active hold in this class
+            const classHolds = myHolds.filter((h) => h.classId === cls.id);
+            const confirmedHold = classHolds.find((h) => h.status === 'CONFIRMED');
+            const activeHold = classHolds.find(
+              (h) => h.status === 'HELD' && new Date(h.expiresAt).getTime() > Date.now()
+            );
+
+            const isEnrolled = !!confirmedHold;
+            const isHeld = !isEnrolled && !!activeHold;
+
             return (
-              <div key={cls.id} className="class-card">
+              <div key={cls.id} className={`class-card ${isEnrolled ? 'enrolled' : isHeld ? 'held' : ''}`}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                     <h3 className="class-title">{cls.name}</h3>
-                    {isFull ? (
+                    {isEnrolled ? (
+                      <span className="badge badge-confirmed" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <CheckCircle2 size={13} />
+                        <span>Enrolled / ভর্তি সম্পন্ন</span>
+                      </span>
+                    ) : isHeld ? (
+                      <span className="badge badge-held" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Clock size={13} />
+                        <span>Seat Reserved / সংরক্ষিত</span>
+                      </span>
+                    ) : isFull ? (
                       <span className="badge badge-expired">Full / পূর্ণ</span>
                     ) : (
                       <span className="badge badge-confirmed">Open / খালি আছে</span>
@@ -221,26 +249,63 @@ export const ClassListScreen: React.FC<Props> = ({
                 </div>
 
                 <div style={{ marginTop: '1rem' }}>
-                  <button
-                    className={`btn ${isFull ? 'btn-secondary' : 'btn-primary'}`}
-                    style={{ width: '100%' }}
-                    disabled={isFull || isApplyingThis || !isStudentIdValid}
-                    onClick={() => handleApply(cls)}
-                  >
-                    {isApplyingThis ? (
-                      <>
-                        <span className="spinner" />
-                        <span>Reserving Seat...</span>
-                      </>
-                    ) : isFull ? (
-                      <span>No Seats Available (আসন পূর্ণ)</span>
-                    ) : (
-                      <>
-                        <span>Apply & Reserve Seat</span>
-                        <ArrowRight size={16} />
-                      </>
-                    )}
-                  </button>
+                  {isEnrolled && confirmedHold ? (
+                    <button
+                      type="button"
+                      className="btn btn-success"
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.45rem',
+                      }}
+                      onClick={() => onSelectHold(confirmedHold.holdId)}
+                      title="View your confirmed admission details"
+                    >
+                      <CheckCircle2 size={16} />
+                      <span>Enrolled • View Admission Details</span>
+                    </button>
+                  ) : isHeld && activeHold ? (
+                    <button
+                      type="button"
+                      className="btn btn-warning"
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.45rem',
+                      }}
+                      onClick={() => onSelectHold(activeHold.holdId)}
+                      title="Continue to complete payment before timer expires"
+                    >
+                      <Clock size={16} />
+                      <span>Reserved • Complete Payment</span>
+                      <ArrowRight size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      className={`btn ${isFull ? 'btn-secondary' : 'btn-primary'}`}
+                      style={{ width: '100%' }}
+                      disabled={isFull || isApplyingThis || !isStudentIdValid}
+                      onClick={() => handleApply(cls)}
+                    >
+                      {isApplyingThis ? (
+                        <>
+                          <span className="spinner" />
+                          <span>Reserving Seat...</span>
+                        </>
+                      ) : isFull ? (
+                        <span>No Seats Available (আসন পূর্ণ)</span>
+                      ) : (
+                        <>
+                          <span>Apply & Reserve Seat</span>
+                          <ArrowRight size={16} />
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             );
