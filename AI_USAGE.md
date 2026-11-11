@@ -36,7 +36,7 @@ An expired hold could remain marked `HELD` until cleanup, causing a conflict wit
 
 ### Environment and Deployment
 
-**5. The browser could not reach the .**
+**5. The browser could not reach the Backend.**
 
 The frontend initially used `http://localhost:8080`, which works inside Docker but not from the browser. I fixed this using runtime configuration through `env-config.js`.
 
