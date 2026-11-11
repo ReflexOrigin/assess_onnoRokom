@@ -36,9 +36,9 @@ An expired hold could remain marked `HELD` until cleanup, causing a conflict wit
 
 ### Environment and Deployment
 
-**5. The browser could not reach the backend.**
+**5. The browser could not reach the .**
 
-The frontend initially used `http://backend:8080`, which works inside Docker but not from the browser. I fixed this using runtime configuration through `env-config.js`.
+The frontend initially used `http://localhost:8080`, which works inside Docker but not from the browser. I fixed this using runtime configuration through `env-config.js`.
 
 **6. Docker builds failed because of Windows build artifacts.**
 
