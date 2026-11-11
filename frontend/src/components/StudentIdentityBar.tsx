@@ -7,7 +7,7 @@ interface Props {
 }
 
 export const StudentIdentityBar: React.FC<Props> = ({ studentState }) => {
-  const { studentId, isValid, error, updateStudentId } = studentState;
+  const { studentId, isValid, error, updateStudentId, clearStudentId } = studentState;
   const [isEditing, setIsEditing] = useState(!studentId || !isValid);
   const [inputValue, setInputValue] = useState(studentId);
 
@@ -24,6 +24,12 @@ export const StudentIdentityBar: React.FC<Props> = ({ studentState }) => {
     if (isValid) {
       setIsEditing(false);
     }
+  };
+
+  const handleClear = () => {
+    clearStudentId();
+    setInputValue('');
+    setIsEditing(true);
   };
 
   return (
@@ -88,18 +94,30 @@ export const StudentIdentityBar: React.FC<Props> = ({ studentState }) => {
               </div>
             </div>
 
-            <button
-              type="button"
-              className="btn btn-sm"
-              style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)' }}
-              onClick={() => {
-                setInputValue(studentId);
-                setIsEditing(true);
-              }}
-              title="Change active student identity"
-            >
-              <Edit2 size={14} /> Change Student
-            </button>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)' }}
+                onClick={() => {
+                  setInputValue(studentId);
+                  setIsEditing(true);
+                }}
+                title="Change active student identity"
+              >
+                <Edit2 size={14} /> Change Student
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ backgroundColor: 'rgba(239,68,68,0.25)', color: '#ffffff', border: '1px solid rgba(239,68,68,0.5)' }}
+                onClick={handleClear}
+                title="Clear active student identity"
+              >
+                <X size={14} /> Clear
+              </button>
+            </div>
           </div>
         )}
       </div>
