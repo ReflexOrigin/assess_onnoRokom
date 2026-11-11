@@ -14,7 +14,7 @@ RUN dotnet restore "SchoolAdmission.sln"
 COPY . .
 
 # Run automated tests during Docker build to enforce verification
-RUN dotnet test "SchoolAdmission.Tests/SchoolAdmission.Tests.csproj" -c Release --no-restore --logger "console;verbosity=normal"
+RUN dotnet test "SchoolAdmission.Tests/SchoolAdmission.Tests.csproj" -c Release --logger "console;verbosity=normal"
 
 # Publish the API project
 WORKDIR "/src/SchoolAdmission.Api"
