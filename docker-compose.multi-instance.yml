@@ -1,0 +1,97 @@
+version: '3.8'
+
+# ==============================================================================
+# Bonus Demonstration: Multi-Instance Distributed Concurrency Setup
+# Backend-1 on 8080, Backend-2 on 8081 sharing the same PostgreSQL database.
+# Verifies that PostgreSQL row-level locks (SELECT ... FOR UPDATE) prevent
+# overselling across multiple separate backend processes.
+# ==============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: school_admission_db_multi
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_secure_password_123}
+      POSTGRES_DB: ${POSTGRES_DB:-school_admission}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_multi:/var/lib/postgresql/data
+      - ./backend/SchoolAdmission.Api/Migrations/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d school_admission"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+    networks:
+      - multi_network
+
+  backend1:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: school_admission_api_node1
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=school_admission;Username=postgres;Password=postgres_secure_password_123
+      HOLD_DURATION_SECONDS: 600
+      CorsOrigins: "*"
+    ports:
+      - "8080:8080"
+    networks:
+      - multi_network
+
+  backend2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: school_admission_api_node2
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=school_admission;Username=postgres;Password=postgres_secure_password_123
+      HOLD_DURATION_SECONDS: 600
+      CorsOrigins: "*"
+    ports:
+      - "8081:8080"
+    networks:
+      - multi_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: school_admission_web_multi
+    restart: unless-stopped
+    depends_on:
+      - backend1
+      - backend2
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+    ports:
+      - "3000:80"
+    networks:
+      - multi_network
+
+volumes:
+  postgres_data_multi:
+    name: school_admission_postgres_data_multi
+
+networks:
+  multi_network:
+    name: school_admission_multi_network
+    driver: bridge
+
